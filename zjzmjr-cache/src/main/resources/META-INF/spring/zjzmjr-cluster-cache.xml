@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<redisCluster>
+	<!--userRoute -->
+	<clusterGroup name="userRoute" selectdb="1">
+		<server host="10.177.129.16" port="6379"></server>
+		<server host="10.177.129.15" port="6379"></server>
+	</clusterGroup>
+	<!--sessionRoute -->
+	<clusterGroup name="sessionRoute" selectdb="2">
+		<server host="10.177.129.16" port="6379"></server>
+		<server host="10.177.129.15" port="6379"></server>
+	</clusterGroup>
+	<!--publicData -->
+	<clusterGroup name="publicData">
+		<server host="10.177.129.16" port="6379"></server>
+		<server host="10.177.129.15" port="6379"></server>
+	</clusterGroup>
+</redisCluster>
