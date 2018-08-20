@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="GBK"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+    xmlns:amq="http://activemq.apache.org/schema/core"
+    xmlns:jms="http://www.springframework.org/schema/jms"
+    xmlns:tx="http://www.springframework.org/schema/tx"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans   
+        http://www.springframework.org/schema/beans/spring-beans-4.1.xsd   
+        http://www.springframework.org/schema/context   
+        http://www.springframework.org/schema/context/spring-context-4.1.xsd
+        http://www.springframework.org/schema/jms
+        http://www.springframework.org/schema/jms/spring-jms-4.1.xsd
+        http://activemq.apache.org/schema/core
+        http://activemq.apache.org/schema/core/activemq-core-5.13.0.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx-4.1.xsd">
+
+    <!-- 重发策略：最多重发次数=maximumRedeliveries -->
+    <amq:redeliveryPolicy id="redeliveryPolicy"
+        maximumRedeliveries="6" />
+
+    <!-- 抓取策略 -->
+    <amq:prefetchPolicy id="prefetchPolicy" queuePrefetch="5" topicPrefetch="5" />
+
+    <!-- activeMQ连接信息，XA事务 -->
+    <amq:xaConnectionFactory id="jmsXaConnectionFactory"
+        brokerURL="${activemq.brokerURL}" 
+        userName="${activemq.username}" 
+        password="${activemq.password}"
+        redeliveryPolicy="#redeliveryPolicy"
+        alwaysSessionAsync="false"
+        alwaysSyncSend="true" 
+        prefetchPolicy="#prefetchPolicy"/>
+
+
+
+    <bean id="amqConnectionFactory"  
+          class="com.atomikos.jms.AtomikosConnectionFactoryBean" init-method="init" destroy-method="close">  
+        <property name="uniqueResourceName" value="XAactiveMQ"/>  
+        <property name="xaConnectionFactory" ref="jmsXaConnectionFactory"/>  
+        <property name="poolSize" value="100"/>
+    </bean>
+
+    <!-- ====Producer side start==== -->
+
+    <!-- 定义JmsTemplate的Queue类型 -->
+    <bean id="jmsQueueTemplate" class="org.springframework.jms.core.JmsTemplate">
+        <constructor-arg ref="amqConnectionFactory" />
+        <!-- 非pub/sub模型（发布/订阅），即队列模式 -->
+        <property name="pubSubDomain" value="false" />
+    </bean>
+
+    <!-- 定义JmsTemplate的Topic类型 -->
+    <bean id="jmsTopicTemplate" class="org.springframework.jms.core.JmsTemplate">
+        <constructor-arg ref="amqConnectionFactory" />
+        <!-- pub/sub模型（发布/订阅） --> 
+        <property name="pubSubDomain" value="true" />
+    </bean>
+
+    <!-- ====Producer side end==== -->
+
+    <!-- ====Consumer side start==== -->
+
+    <!--这个是sessionAwareQueue目的地（响应消息）-->  
+    <amq:queue id="queueReceiver2ResponseDestination"  physicalName="test.queue2.response" />
+
+    <!-- 定义Queue监听器（无事务） -->
+    <jms:listener-container
+        destination-type="queue" 
+        container-type="default" 
+        connection-factory="amqConnectionFactory" 
+        error-handler="jmsErrorHandler"
+        acknowledge="auto">
+        <jms:listener destination="xinge.queue.push" ref="xgMessageReceiver"  concurrency="5-100" />
+        <jms:listener destination="xinge.queue.push.device.multiple" ref="xgMessageReceiverMultiple"  concurrency="5-100" />
+    </jms:listener-container>
+
+    <!-- 定义Queue监听器（有事务） -->
+    <jms:listener-container
+        destination-type="queue" 
+        container-type="default" 
+        connection-factory="amqConnectionFactory" 
+        transaction-manager="jtaTransactionManager"
+        error-handler="jmsErrorHandler"
+        acknowledge="transacted">
+        <jms:listener destination="xinge.queue.push.invokelog" ref="xgMessageReceiverInvokeLog"  concurrency="5-100" />
+<!--        <jms:listener destination="test.queue" ref="queueReceiver"  concurrency="10-100" /> -->
+<!--        <jms:listener destination="test.queue2" ref="queueReceiver2"  concurrency="2-10"/> -->
+<!--        <jms:listener destination="test.queue2.response" ref="queueReceiver2Response" concurrency="2-10" /> -->
+    </jms:listener-container>
+
+    <!-- 定义Topic监听器 -->
+<!--    <jms:listener-container  -->
+<!--        destination-type="topic"   -->
+<!--        container-type="default"  -->
+<!--        connection-factory="amqConnectionFactory" -->
+<!--        transaction-manager="jtaTransactionManager" -->
+<!--        error-handler="jmsErrorHandler" -->
+<!--        acknowledge="transacted" > -->
+<!--        <jms:listener destination="test.topic" ref="topicReceiver" /> -->
+<!--        <jms:listener destination="test.topic" ref="topicReceiver2" /> -->
+<!--    </jms:listener-container> -->
+
+    <!-- ====Consumer side end==== -->
+
+    <bean id="xingeApp" class="com.tencent.xinge.XingeApp">
+        <constructor-arg index="0" value="2100170086"/><!-- accessId -->
+        <constructor-arg index="1" value="2d257b10220bc3849743ffe0e9bd233a"/><!-- secretKey -->
+    </bean>
+
+</beans>
