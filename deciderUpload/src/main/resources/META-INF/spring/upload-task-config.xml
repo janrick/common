@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+ http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+ http://www.springframework.org/schema/context 
+ http://www.springframework.org/schema/context/spring-context-3.2.xsd
+   http://www.springframework.org/schema/tx 
+   http://www.springframework.org/schema/tx/spring-tx-3.2.xsd"
+	default-lazy-init="true" default-autowire="byName">
+	<context:component-scan base-package="com.zjzmjr.task.core" />
+	<!-- 线程执行器配置，用于任务注册 -->
+	<bean id="executorThreads"
+		class="org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor">
+		<property name="corePoolSize" value="10" />
+		<property name="maxPoolSize" value="100" />
+		<property name="queueCapacity" value="500" />
+		<property name="keepAliveSeconds" value="200" />
+		<property name="allowCoreThreadTimeOut" value="true" />
+	</bean>
+
+	<!-- 要调用的工作类 -->
+	<bean id="socketUploadJob" class="com.zjzmjr.loan.upload.web.ftp.SocketUploadTask" />
+    <bean id="imgFileFixRemoveJob" class="com.zjzmjr.loan.upload.web.ftp.ImgFileFixRemoveTask" />
+
+	<!--调度业务 : 定义调用对象和调用对象的方法 -->
+	<bean id="socketUploadTask"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<!-- 调用的类 -->
+		<property name="targetObject" ref="socketUploadJob" />
+		<!-- 调用类中的方法 -->
+		<property name="targetMethod" value="execute" />
+		<!-- 允许任务并发执行 -->
+		<property name="concurrent" value="false" />
+	</bean>
+	<bean id="imgFileFixRemoveTask"
+		class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+		<!-- 调用的类 -->
+		<property name="targetObject" ref="imgFileFixRemoveJob" />
+		<!-- 调用类中的方法 -->
+		<property name="targetMethod" value="execute" />
+		<!-- 允许任务并发执行 -->
+		<property name="concurrent" value="false" />
+	</bean>
+
+	<!-- 定义触发时间 -->
+	<bean id="doSocketUploadTask"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="socketUploadTask" />
+		<!-- cron表达式 每天凌晨1点，早上7点和下午1点各执行一次 -->
+		<property name="cronExpression" value="*/5 * * * * ?" />
+	</bean>
+	<bean id="doImgFileFixRemoveTask"
+		class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+		<property name="jobDetail" ref="imgFileFixRemoveTask" />
+		<!-- cron表达式 每天24点执行一次 -->
+		<property name="cronExpression" value="*/6 * * * * ?" /><!-- 0 0/1 * * * ? -->
+	</bean>
+
+	<!--设置调度 总管理类 如果将lazy-init='false'那么容器启动就会执行调度程序 
+				
+				<ref bean="doImgFileFixRemoveTask"/>-->
+	<bean id="schedulerFactoryBean" autowire="no"
+		class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+		<property name="triggers">
+			<list>
+				<ref bean="doSocketUploadTask" />
+			</list>
+		</property>
+		<property name="startupDelay" value="30" />
+		<property name="taskExecutor" ref="executorThreads" />
+	</bean>
+
+</beans>
